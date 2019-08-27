@@ -1,4 +1,4 @@
-//-------------------------------------------------------------------------
+    IMAGE_LAYER_T imageLayer;//-------------------------------------------------------------------------
 //
 // The MIT License (MIT)
 //
@@ -56,9 +56,7 @@ volatile bool run = true;
 
 //-------------------------------------------------------------------------
 
-static void
-signalHandler(
-    int signalNumber)
+static void signalHandler(int signalNumber)
 {
     switch (signalNumber)
     {
@@ -76,15 +74,15 @@ void usage(void)
 {
     fprintf(stderr, "Usage: %s ", program);
     fprintf(stderr, "[-b <RGBA>] [-d <number>] [-l <layer>] ");
-    fprintf(stderr, "[-x <offset>] [-y <offset>] <file.png>\n");
+    fprintf(stderr, "[-x <offset>] [-y <offset>] [-w <pixels> -h <pixels>]\n");
     fprintf(stderr, "    -b - set background colour 16 bit RGBA\n");
     fprintf(stderr, "         e.g. 0x000F is opaque black\n");
     fprintf(stderr, "    -d - Raspberry Pi display number\n");
     fprintf(stderr, "    -l - DispmanX layer number\n");
     fprintf(stderr, "    -x - offset (pixels from the left)\n");
     fprintf(stderr, "    -y - offset (pixels from the top)\n");
-    fprintf(stderr, "    -t - timeout in ms\n");
-    fprintf(stderr, "    -n - non-interactive mode\n");
+    fprintf(stderr, "    -w - width  (pixels)\n");
+    fprintf(stderr, "    -h - height (pixels)\n");
 
     exit(EXIT_FAILURE);
 }
@@ -96,12 +94,10 @@ int main(int argc, char *argv[])
     uint16_t background = 0x000F;
     int32_t layer = 1;
     uint32_t displayNumber = 0;
-    int32_t xOffset = 0;
-    int32_t yOffset = 0;
-    uint32_t timeout = 0;
-    bool xOffsetSet = false;
-    bool yOffsetSet = false;
-    bool interactive = true;
+    int32_t xOffset = 200;
+    int32_t yOffset = 200;
+    int32_t xSize = 200;
+    int32_t ySize = 200;
 
     program = basename(argv[0]);
 
@@ -109,7 +105,7 @@ int main(int argc, char *argv[])
 
     int opt = 0;
 
-    while ((opt = getopt(argc, argv, "b:d:l:x:y:t:n")) != -1)
+    while ((opt = getopt(argc, argv, "b:d:l:x:y:w:h:")) != -1)
     {
         switch(opt)
         {
@@ -131,61 +127,25 @@ int main(int argc, char *argv[])
         case 'x':
 
             xOffset = strtol(optarg, NULL, 10);
-            xOffsetSet = true;
             break;
 
         case 'y':
 
             yOffset = strtol(optarg, NULL, 10);
-            yOffsetSet = true;
             break;
         
-        case 't':
-
-            timeout = atoi(optarg);
+        case 'w':
+            xSize = strtol(optarg, NULL, 10);
             break;
 
-        case 'n':
-
-            interactive = false;
+        case 'h':
+            ySize = strtol(optarg, NULL, 10);
             break;
 
         default:
 
             usage();
             break;
-        }
-    }
-
-    //---------------------------------------------------------------------
-
-    if (optind >= argc)
-    {
-        usage();
-    }
-
-    //---------------------------------------------------------------------
-
-    IMAGE_LAYER_T imageLayer;
-
-    const char *imagePath = argv[optind];
-
-    if(strcmp(imagePath, "-") == 0)
-    {
-        // Use stdin
-        if (loadPngFile(&(imageLayer.image), stdin) == false)
-        {
-            fprintf(stderr, "unable to load %s\n", imagePath);
-            exit(EXIT_FAILURE);
-        }
-    }
-    else
-    {
-        // Load image from path
-        if (loadPng(&(imageLayer.image), imagePath) == false)
-        {
-            fprintf(stderr, "unable to load %s\n", imagePath);
-            exit(EXIT_FAILURE);
         }
     }
 
@@ -223,34 +183,14 @@ int main(int argc, char *argv[])
 
     //---------------------------------------------------------------------
 
-    BACKGROUND_LAYER_T backgroundLayer;
+    IMAGE_LAYER_T backdropLayer;
 
-    if (background > 0)
-    {
-        initBackgroundLayer(&backgroundLayer, background, 0);
-    }
-
-    createResourceImageLayer(&imageLayer, layer);
+    createResourceImageLayer(&backdropLayer, layer);
 
     //---------------------------------------------------------------------
 
     DISPMANX_UPDATE_HANDLE_T update = vc_dispmanx_update_start(0);
     assert(update != 0);
-
-    if (background > 0)
-    {
-        addElementBackgroundLayer(&backgroundLayer, display, update);
-    }
-
-    if (xOffsetSet == false)
-    {
-        xOffset = (info.width - imageLayer.image.width) / 2;
-    }
-
-    if (yOffsetSet == false)
-    {
-        yOffset = (info.height - imageLayer.image.height) / 2;
-    }
 
     addElementImageLayerOffset(&imageLayer,
                                xOffset,
@@ -261,121 +201,19 @@ int main(int argc, char *argv[])
     result = vc_dispmanx_update_submit_sync(update);
     assert(result == 0);
 
-    //---------------------------------------------------------------------
-
-    int32_t step = 1;
-    uint32_t currentTime = 0;
-
     // Sleep for 10 milliseconds every run-loop
     const int sleepMilliseconds = 10;
 
     while (run)
     {
-        int c = 0;
-        if (interactive && keyPressed(&c))
-        {
-            c = tolower(c);
-
-            bool moveLayer = false;
-
-            switch (c)
-            {
-            case 27:
-
-                run = false;
-                break;
-
-            case 'a':
-
-                xOffset -= step;
-                moveLayer = true;
-                break;
-
-            case 'd':
-
-                xOffset += step;
-                moveLayer = true;
-                break;
-
-            case 'w':
-
-                yOffset -= step;
-                moveLayer = true;
-                break;
-
-            case 's':
-
-                yOffset += step;
-                moveLayer = true;
-                break;
-
-            case '+':
-
-                if (step == 1)
-                {
-                    step = 5;
-                }
-                else if (step == 5)
-                {
-                    step = 10;
-                }
-                else if (step == 10)
-                {
-                    step = 20;
-                }
-                break;
-
-            case '-':
-
-                if (step == 20)
-                {
-                    step = 10;
-                }
-                else if (step == 10)
-                {
-                    step = 5;
-                }
-                else if (step == 5)
-                {
-                    step = 1;
-                }
-                break;
-            }
-
-            if (moveLayer)
-            {
-                update = vc_dispmanx_update_start(0);
-                assert(update != 0);
-
-                moveImageLayer(&imageLayer, xOffset, yOffset, update);
-
-                result = vc_dispmanx_update_submit_sync(update);
-                assert(result == 0);
-            }
-        }
-
-        //---------------------------------------------------------------------
-
         usleep(sleepMilliseconds * 1000);
-
-        currentTime += sleepMilliseconds;
-        if (timeout != 0 && currentTime >= timeout) {
-            run = false;
-        }
     }
 
     //---------------------------------------------------------------------
 
     keyboardReset();
 
-    //---------------------------------------------------------------------
-
-    if (background > 0)
-    {
-        destroyBackgroundLayer(&backgroundLayer);
-    }
-
-    destroyImageLayer(&imageLayer);
+    destroyImageLayer(&backdropLayer);
 
     //---------------------------------------------------------------------
 
