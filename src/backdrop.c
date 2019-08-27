@@ -35,10 +35,10 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-#include "backgroundLayer.h"
-#include "imageLayer.h"
-#include "key.h"
-#include "loadpng.h"
+#include <raspidmx/common/backgroundLayer.h>
+#include <raspidmx/common/imageLayer.h>
+#include <raspidmx/common/key.h>
+#include <raspidmx/common/loadpng.h>
 
 #include "bcm_host.h"
 
