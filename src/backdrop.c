@@ -1,7 +1,8 @@
-    IMAGE_LAYER_T imageLayer;//-------------------------------------------------------------------------
+//-------------------------------------------------------------------------
 //
 // The MIT License (MIT)
 //
+// Copyright (c) 2019 Chintalagiri Shashank
 // Copyright (c) 2013 Andrew Duncan
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -62,7 +63,7 @@ static void signalHandler(int signalNumber)
     {
     case SIGINT:
     case SIGTERM:
-
+        fclose(stdin);
         run = false;
         break;
     };
@@ -73,10 +74,8 @@ static void signalHandler(int signalNumber)
 void usage(void)
 {
     fprintf(stderr, "Usage: %s ", program);
-    fprintf(stderr, "[-b <RGBA>] [-d <number>] [-l <layer>] ");
-    fprintf(stderr, "[-x <offset>] [-y <offset>] [-w <pixels> -h <pixels>]\n");
-    fprintf(stderr, "    -b - set background colour 16 bit RGBA\n");
-    fprintf(stderr, "         e.g. 0x000F is opaque black\n");
+    fprintf(stderr, "[-d <number>] [-l <layer>] ");
+    fprintf(stderr, "[-x <offset>] [-y <offset>] [-w <pixels>] [-h <pixels>]\n");
     fprintf(stderr, "    -d - Raspberry Pi display number\n");
     fprintf(stderr, "    -l - DispmanX layer number\n");
     fprintf(stderr, "    -x - offset (pixels from the left)\n");
@@ -91,13 +90,12 @@ void usage(void)
 
 int main(int argc, char *argv[])
 {
-    uint16_t background = 0x000F;
     int32_t layer = 1;
     uint32_t displayNumber = 0;
-    int32_t xOffset = 200;
-    int32_t yOffset = 200;
-    int32_t xSize = 200;
-    int32_t ySize = 200;
+    uint32_t xOffset = 200;
+    uint32_t yOffset = 200;
+    uint32_t xSize = 200;
+    uint32_t ySize = 200;
 
     program = basename(argv[0]);
 
@@ -109,11 +107,6 @@ int main(int argc, char *argv[])
     {
         switch(opt)
         {
-        case 'b':
-
-            background = strtol(optarg, NULL, 16);
-            break;
-
         case 'd':
 
             displayNumber = strtol(optarg, NULL, 10);
@@ -164,7 +157,7 @@ int main(int argc, char *argv[])
         perror("installing SIGTERM signal handler");
         exit(EXIT_FAILURE);
     }
-
+    
     //---------------------------------------------------------------------
 
     bcm_host_init();
@@ -182,44 +175,104 @@ int main(int argc, char *argv[])
     assert(result == 0);
 
     //---------------------------------------------------------------------
-
-    IMAGE_LAYER_T backdropLayer;
-
-    createResourceImageLayer(&backdropLayer, layer);
-
+    
+    VC_IMAGE_TYPE_T type = VC_IMAGE_RGBA32;
+    uint32_t vc_image_ptr;
+    
+    DISPMANX_RESOURCE_HANDLE_T resource =
+        vc_dispmanx_resource_create(type, 2, 2, &vc_image_ptr);
+    assert(resource != 0);
+    
+    VC_DISPMANX_ALPHA_T alpha =
+    {
+        DISPMANX_FLAGS_ALPHA_FIXED_ALL_PIXELS, 
+        255, /*alpha 0->255*/
+        0
+    };
+    
+    VC_RECT_T src_rect;
+    VC_RECT_T dst_rect;
+    
+    vc_dispmanx_rect_set(&src_rect, xOffset, yOffset, xSize, ySize);
+    vc_dispmanx_rect_set(&dst_rect, xOffset, yOffset, xSize, ySize);
+    
     //---------------------------------------------------------------------
 
     DISPMANX_UPDATE_HANDLE_T update = vc_dispmanx_update_start(0);
     assert(update != 0);
 
-    addElementImageLayerOffset(&imageLayer,
-                               xOffset,
-                               yOffset,
-                               display,
-                               update);
+    DISPMANX_ELEMENT_HANDLE_T element =
+        vc_dispmanx_element_add(update,
+                                display,
+                                layer, // layer
+                                &dst_rect,
+                                resource,
+                                &src_rect,
+                                DISPMANX_PROTECTION_NONE,
+                                &alpha,
+                                NULL, // clamp
+                                DISPMANX_NO_ROTATE);
+    assert(element != 0);
+    
+    //---------------------------------------------------------------------
 
     result = vc_dispmanx_update_submit_sync(update);
     assert(result == 0);
 
-    // Sleep for 10 milliseconds every run-loop
-    const int sleepMilliseconds = 10;
-
     while (run)
     {
-        usleep(sleepMilliseconds * 1000);
+        
+        scanf("%d,%d,%d,%d", &xOffset, &yOffset, &xSize, &ySize);
+        
+        update = vc_dispmanx_update_start(0);
+        assert(update != 0);
+        
+        //-----------------------------------------------------------------
+        
+        result = vc_dispmanx_element_remove(update, element);
+        assert(result == 0);
+        
+        //-----------------------------------------------------------------
+        
+        vc_dispmanx_rect_set(&src_rect, xOffset, yOffset, xSize, ySize);
+        vc_dispmanx_rect_set(&dst_rect, xOffset, yOffset, xSize, ySize);
+        
+        element = vc_dispmanx_element_add(
+                                update,
+                                display,
+                                layer, // layer
+                                &dst_rect,
+                                resource,
+                                &src_rect,
+                                DISPMANX_PROTECTION_NONE,
+                                &alpha,
+                                NULL, // clamp
+                                DISPMANX_NO_ROTATE);
+        assert(element != 0);
+
+        //-----------------------------------------------------------------
+        
+        result = vc_dispmanx_update_submit_sync(update);
+        assert(result == 0);
     }
 
     //---------------------------------------------------------------------
 
     keyboardReset();
 
-    destroyImageLayer(&backdropLayer);
-
     //---------------------------------------------------------------------
-
+    update = vc_dispmanx_update_start(0);
+    assert(update != 0);
+    result = vc_dispmanx_element_remove(update, element);
+    assert(result == 0);
+    result = vc_dispmanx_update_submit_sync(update);
+    assert(result == 0);
+    //---------------------------------------------------------------------
+    result = vc_dispmanx_resource_delete(resource);
+    assert(result == 0);
+    //---------------------------------------------------------------------
     result = vc_dispmanx_display_close(display);
     assert(result == 0);
-
     //---------------------------------------------------------------------
 
     return 0;
