@@ -22,7 +22,7 @@ Designed for use with python's subprocess.communicate() or similar, backdrop wil
 
 backdrop depends on Andrew Duncan's [raspidmx](https://github.com/AndrewFromMelbourne/raspidmx) library and draws heavily from the included `test_pattern` application. 
 
-Get and compile the `raspidmx` sources. The generated `libraspidmx.so` in ``raspidmx/lib` should be installed to your system, typically to `/usr/local/lib`. The makefile provided with `backdrop` expects the associated header files from `raspidmx/common` to be available at `/usr/local/include/raspidmx/common`. Since `raspidmx` is really just a collection of examples and not intended to be installed, installing the built library binary and headers to the correct places is left to the user. Alternatively, adjust `backdrop/Makefile` to suit your particular setup. 
+Get and compile the `raspidmx` sources. The generated `libraspidmx.so` in `raspidmx/lib` should be installed to your system, typically to `/usr/local/lib`. The makefile provided with `backdrop` expects the associated header files from `raspidmx/common` to be available at `/usr/local/include/raspidmx/common`. Since `raspidmx` is really just a collection of examples and not intended to be installed, installing the built library binary and headers to the correct places is left to the user. Alternatively, adjust `backdrop/Makefile` to suit your particular setup. 
 
 ## Building
 
