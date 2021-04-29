@@ -2,9 +2,9 @@ OBJS=backdrop.o
 BIN=backdrop
 
 CFLAGS+=-Wall -g -O3 $(shell libpng-config --cflags)
-LDFLAGS+=-L/opt/vc/lib/ -lbcm_host -lm $(shell libpng-config --ldflags) -lraspidmx
+LDFLAGS+=-L/opt/vc/lib/ -L../lib -lbcm_host -lm $(shell libpng-config --ldflags) -lraspidmx
 
-INCLUDES+=-I/opt/vc/include/ -I/opt/vc/include/interface/vcos/pthreads -I/opt/vc/include/interface/vmcs_host/linux
+INCLUDES+=-I../include -I/opt/vc/include/ -I/opt/vc/include/interface/vcos/pthreads -I/opt/vc/include/interface/vmcs_host/linux
 
 all: $(BIN)
 
